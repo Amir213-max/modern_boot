@@ -44,6 +44,8 @@ const BotInterface: React.FC<BotInterfaceProps> = ({ customer, onSessionEnd, onA
     const fileInputRef = useRef<HTMLInputElement>(null);
     const textInputRef = useRef<HTMLInputElement>(null); // Ref for text input
     const initialized = useRef(false);
+    const systemInstructionRef = useRef<string>('');
+    const toolsRef = useRef<any[]>([]);
 
     // Smart Robot Icon (SVG Data URI) - Replaced with Modern Soft Logo
     const ROBOT_ICON = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23F7941D'/%3E%3Cpath d='M20 30 Q 50 15 80 30 V 75 Q 50 90 20 75 Z' fill='white' opacity='0.2'/%3E%3Ctext x='50' y='65' font-size='45' font-weight='bold' font-family='serif' text-anchor='middle' fill='white'%3EMS%3C/text%3E%3C/svg%3E";
@@ -182,10 +184,7 @@ const BotInterface: React.FC<BotInterfaceProps> = ({ customer, onSessionEnd, onA
                     ? `Client Name: ${customer.name}\nContract Number: ${customer.contractNumber}\nPrevious Logins: ${new Date(Number(customer.lastLogin)).toLocaleDateString()}`
                     : "Client: Guest/Unknown";
 
-                chatRef.current = ai.chats.create({
-                    model: 'gemini-2.5-flash',
-                    config: {
-                        systemInstruction: `You are "E-stock Bot" (مساعد إي ستوك), a dedicated and expert TECHNICAL SUPPORT agent for Modern Soft.
+                const systemInstruction = `You are "E-stock Bot" (مساعد إي ستوك), a dedicated and expert TECHNICAL SUPPORT agent for Modern Soft.
                     
                     **YOUR IDENTITY & TONE:**
                     - You are a smart, friendly, and expert support agent.
@@ -207,8 +206,19 @@ const BotInterface: React.FC<BotInterfaceProps> = ({ customer, onSessionEnd, onA
                     - **Greeting**:  If the customer name is known (${clientName}), welcome them warmly.
                     - **Unknowns**: If the info is completely missing from your docs, say: "للاسف المعلومة دي مش موجودة عندي حالياً، ممكن تتواصل مع الدعم الفني عشان يفيدوك أكتر." provide the phone number.
 
-                    ${docsInstruction}`,
-                        tools: [{ functionDeclarations: [searchKBTool, showImageTool, showSnippetImageTool] }],
+                    ${docsInstruction}`;
+
+                const tools = [{ functionDeclarations: [searchKBTool, showImageTool, showSnippetImageTool] }];
+
+                // Store for API route usage in production
+                systemInstructionRef.current = systemInstruction;
+                toolsRef.current = tools;
+
+                chatRef.current = ai.chats.create({
+                    model: 'gemini-2.5-flash',
+                    config: {
+                        systemInstruction: systemInstruction,
+                        tools: tools,
                     },
                 });
 
@@ -296,10 +306,56 @@ const BotInterface: React.FC<BotInterfaceProps> = ({ customer, onSessionEnd, onA
         }
     };
 
+    // Wrapper function for Gemini API calls - routes to direct call (DEV) or API route (production)
+    const sendMessageToGemini = async (params: { message: any; functionCalls?: any[] }): Promise<{ text: string; functionCalls?: any[] }> => {
+        // Local development: use direct Gemini API call
+        if (import.meta.env.DEV) {
+            if (!chatRef.current) {
+                throw new Error("Chat not initialized");
+            }
+            return await chatRef.current.sendMessage({ message: params.message });
+        }
+
+        // Production: use API route
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: params.message,
+                    systemInstruction: systemInstructionRef.current,
+                    tools: toolsRef.current,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return {
+                text: data.text || '',
+                functionCalls: data.functionCalls || undefined
+            };
+        } catch (error) {
+            console.error('API Route Error:', error);
+            throw error;
+        }
+    };
+
     const handleSend = async (e?: React.FormEvent) => {
         e?.preventDefault();
         if ((!input.trim() && !selectedImage) || isLoading || isEnding) return;
-        if (!chatRef.current) {
+        // In production, we don't need chatRef.current, but in DEV we do
+        if (import.meta.env.DEV && !chatRef.current) {
+            alert("جاري الاتصال بالنظام، يرجى الانتظار قليلاً...");
+            return;
+        }
+        // In production, check if we have system instruction (chat initialized)
+        if (!import.meta.env.DEV && !systemInstructionRef.current) {
             alert("جاري الاتصال بالنظام، يرجى الانتظار قليلاً...");
             return;
         }
@@ -326,7 +382,6 @@ const BotInterface: React.FC<BotInterfaceProps> = ({ customer, onSessionEnd, onA
         setStatusText(currentImage ? 'جاري تحليل الصورة...' : 'جاري الكتابة...');
 
         try {
-            const chat = chatRef.current;
             let messagePayload: any = userText;
 
             // Construct payload if image exists
@@ -347,7 +402,7 @@ const BotInterface: React.FC<BotInterfaceProps> = ({ customer, onSessionEnd, onA
                 }
             }
 
-            let response = await chat.sendMessage({ message: messagePayload });
+            let response = await sendMessageToGemini({ message: messagePayload });
 
             // Loop to handle potential multiple tool calls
             while (response.functionCalls && response.functionCalls.length > 0) {
@@ -426,7 +481,7 @@ const BotInterface: React.FC<BotInterfaceProps> = ({ customer, onSessionEnd, onA
                     }
                 }));
 
-                response = await chat.sendMessage({ message: parts });
+                response = await sendMessageToGemini({ message: parts });
             }
 
             const modelText = response.text;
@@ -461,7 +516,7 @@ const BotInterface: React.FC<BotInterfaceProps> = ({ customer, onSessionEnd, onA
             let extractedName = "زائر";
             let summary = "محادثة عامة";
 
-            if (chatRef.current && messages.length > 1) {
+            if ((chatRef.current || systemInstructionRef.current) && messages.length > 1) {
                 const analysisPrompt = `
              SYSTEM_INTERNAL_REQUEST:
              The session is ending. Please analyze the entire conversation history above.
@@ -473,7 +528,7 @@ const BotInterface: React.FC<BotInterfaceProps> = ({ customer, onSessionEnd, onA
              `;
 
                 try {
-                    const result = await chatRef.current.sendMessage({
+                    const result = await sendMessageToGemini({
                         message: analysisPrompt
                     });
 

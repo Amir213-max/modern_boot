@@ -7,12 +7,11 @@ interface LoginProps {
     onLoginSuccess: (customer: Customer) => void;
     onAdminLogin: () => void;
     onBack: () => void;
-    onGoToRegister: () => void;
     isDarkMode: boolean;
     expired?: boolean;
 }
 
-const Login: React.FC<LoginProps> = ({ onLoginSuccess, onAdminLogin, onBack, onGoToRegister, isDarkMode, expired }) => {
+const Login: React.FC<LoginProps> = ({ onLoginSuccess, onAdminLogin, onBack, isDarkMode, expired }) => {
     // Admin Login State NOT used here anymore - moved to Bot Interface
     // We only need basic login state
     const [name, setName] = useState('');
@@ -139,16 +138,6 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onAdminLogin, onBack, onG
                 </form>
 
                 <div className={`mt-6 text-center text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                    <p className="mb-2">ليس لديك حساب؟</p>
-                    <button
-                        onClick={onGoToRegister}
-                        className={`text-sm font-medium underline transition-colors ${isDarkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}
-                    >
-                        إنشاء حساب جديد
-                    </button>
-                </div>
-
-                <div className={`mt-4 text-center text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
                     <p>نظام الدعم الفني الذكي © Modern Soft</p>
                 </div>
             </div>

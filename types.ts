@@ -30,7 +30,6 @@ export interface ToolCallArgs {
 export enum AppMode {
   LANDING = 'LANDING',
   LOGIN = 'LOGIN',
-  REGISTER = 'REGISTER',
   CLIENT = 'CLIENT',
   ADMIN = 'ADMIN'
 }

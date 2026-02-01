@@ -638,32 +638,6 @@ export const db = {
         }
         return uniqueNew.length;
     },
-    registerCustomer: async (name: string, contractNumber: string): Promise<{ success: boolean; customer?: Customer; error?: string }> => {
-        // Check if contract number already exists
-        const customers = await db.getCustomers();
-        const existing = customers.find(c => c.contractNumber.trim() === contractNumber.trim());
-        
-        if (existing) {
-            return { success: false, error: 'رقم التعاقد مسجل بالفعل' };
-        }
-
-        // Check if name and contract number are provided
-        if (!name.trim() || !contractNumber.trim()) {
-            return { success: false, error: 'يرجى إدخال الاسم ورقم التعاقد' };
-        }
-
-        // Create new customer
-        const newCustomer: Customer = {
-            id: Date.now().toString(),
-            name: name.trim(),
-            contractNumber: contractNumber.trim(),
-            isActive: true,
-            createdAt: Date.now()
-        };
-
-        await db.saveCustomer(newCustomer);
-        return { success: true, customer: newCustomer };
-    },
 
     // --- App Settings ---
     getAppSettings: async (): Promise<AppSettings> => {

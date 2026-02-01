@@ -4,7 +4,6 @@ import BotInterface from './components/BotInterface';
 import RatingModal from './components/RatingModal';
 import ModernSoftLanding from './components/ModernSoftLanding';
 import Login from './components/Login';
-import Register from './components/Register';
 import AdminDashboard from './components/AdminDashboard';
 import { AppMode, ChatLog, Customer } from './types';
 import { db } from './services/db';
@@ -173,25 +172,8 @@ const App: React.FC = () => {
                         }}
                         onAdminLogin={() => setMode(AppMode.ADMIN)}
                         onBack={() => setMode(AppMode.LANDING)}
-                        onGoToRegister={() => setMode(AppMode.REGISTER)}
                         isDarkMode={isDarkMode}
                         expired={isSessionExpired}
-                    />
-                </div>
-            )}
-
-            {/* REGISTER MODE */}
-            {mode === AppMode.REGISTER && (
-                <div className="h-full w-full animate-in fade-in zoom-in-95 duration-300">
-                    <Register
-                        onRegisterSuccess={(customer) => {
-                            setCurrentUser(customer);
-                            setIsSessionExpired(false);
-                            setMode(AppMode.CLIENT);
-                        }}
-                        onBack={() => setMode(AppMode.LANDING)}
-                        onGoToLogin={() => setMode(AppMode.LOGIN)}
-                        isDarkMode={isDarkMode}
                     />
                 </div>
             )}
